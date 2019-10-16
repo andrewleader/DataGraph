@@ -1,0 +1,45 @@
+﻿@page
+@model DataGraph.Pages.Account.EditModel
+
+@{
+    ViewData["Title"] = "Edit";
+}
+
+<h1>Edit</h1>
+
+<h4>DataGraph</h4>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <form method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="form-group">
+                <label asp-for="DataGraph.CustomerId" class="control-label"></label>
+                <input asp-for="DataGraph.CustomerId" class="form-control" />
+                <span asp-validation-for="DataGraph.CustomerId" class="text-danger"></span>
+            </div>
+            <input type="hidden" asp-for="DataGraph.Id" />
+            <div class="form-group">
+                <label asp-for="DataGraph.Name" class="control-label"></label>
+                <input asp-for="DataGraph.Name" class="form-control" />
+                <span asp-validation-for="DataGraph.Name" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="DataGraph.SchemaJson" class="control-label"></label>
+                <input asp-for="DataGraph.SchemaJson" class="form-control" />
+                <span asp-validation-for="DataGraph.SchemaJson" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <input type="submit" value="Save" class="btn btn-primary" />
+            </div>
+        </form>
+    </div>
+</div>
+
+<div>
+    <a asp-page="./Index">Back to List</a>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

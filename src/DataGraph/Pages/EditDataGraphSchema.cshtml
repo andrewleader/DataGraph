@@ -1,0 +1,37 @@
+﻿@page
+@using DataGraph.Models;
+@model DataGraph.Pages.EditDataGraphSchemaModel
+
+@{
+    ViewData["Title"] = "EditDataGraphSchema";
+}
+
+<h1>Editing @Model.DataGraphInstance.Name</h1>
+
+<p>Please note that any modifications will currently wipe any existing stored data items in your graph.</p>
+
+<hr />
+
+<h2>User values</h2>
+<partial name="_EditableDataGraphClass" model="new EditableDataGraphClassModel(Model.DataGraphInstance.Schema, Model.DataGraphInstance.Schema.User)" />
+
+<h2>Global values</h2>
+<partial name="_EditableDataGraphClass" model="new EditableDataGraphClassModel(Model.DataGraphInstance.Schema, Model.DataGraphInstance.Schema.Global)" />
+
+<h2>Custom types</h2>
+
+@foreach (var type in Model.DataGraphInstance.Schema.CustomTypes)
+{
+    <h3>@type.ClassName</h3>
+    <partial name="_EditableDataGraphClass" model="new EditableDataGraphClassModel(Model.DataGraphInstance.Schema, type)" />
+}
+
+<form method="post">
+    <div class="form-group">
+        <label class="control-label">Class name</label>
+        <input name="ClassName" class="form-control" type="text" />
+    </div>
+    <div class="form-group">
+        <input type="submit" name="OperationType" value="Add class" class="btn btn-primary" />
+    </div>
+</form>

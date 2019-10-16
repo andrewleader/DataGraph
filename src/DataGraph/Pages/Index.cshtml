@@ -1,0 +1,29 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home page";
+}
+
+    <div class="text-center">
+        @if (User.Identity.IsAuthenticated)
+        {
+            <h1 class="display-4">Welcome, @User.Claims.First().Value</h1>
+
+            <h2>Your DataGraphs</h2>
+
+            <ul>
+                @foreach (var dg in Model.DataGraphs)
+                {
+                    <li>
+                        <a asp-page="ViewDataGraph" asp-route-id="@dg.Id">@dg.Name</a>
+                    </li>
+                }
+            </ul>
+
+            <a asp-page="CreateDataGraph">➕ Create new DataGraph</a>
+        }
+        else
+        {
+            <h1 class="display-4">Welcome, please login</h1>
+        }
+    </div>
