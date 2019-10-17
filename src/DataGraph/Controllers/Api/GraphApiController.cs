@@ -36,7 +36,9 @@ namespace DataGraph.Controllers.Api
             {
                 case "global":
                     {
-                        return GetObjectJson(customerId, graphId, graph.GlobalObjectId);
+                        var globalObj = GetObjectJson(customerId, graphId, graph.GlobalObjectId);
+                        globalObj.Remove("Id");
+                        return globalObj;
                     }
 
                 case "me":
@@ -52,6 +54,8 @@ namespace DataGraph.Controllers.Api
         private JObject GetObjectJson(string customerId, int graphId, int objectId)
         {
             JObject answer = new JObject();
+
+            answer.Add("Id", objectId);
 
             foreach (var literalProp in _context.LiteralPropertyValues.Where(i =>
                 i.CustomerId == customerId

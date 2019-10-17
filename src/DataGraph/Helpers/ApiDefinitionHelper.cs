@@ -13,10 +13,13 @@ namespace DataGraph.Helpers
     {
         public static IEnumerable<ApiDefinition> GetApiDefinitions(this DataGraphSchema schema)
         {
+            var userSchema = schema.User.GetApiReturnFormat(schema);
+            userSchema.Remove("Id");
+
             yield return new ApiDefinition()
             {
                 RelativePath = "/me",
-                ReturnFormat = schema.User.GetApiReturnFormat(schema).ToString()
+                ReturnFormat = userSchema.ToString()
             };
 
             foreach (var def in schema.User.GetApiDefinitions(schema, "/me"))
@@ -24,10 +27,13 @@ namespace DataGraph.Helpers
                 yield return def;
             }
 
+            var globalSchema = schema.Global.GetApiReturnFormat(schema);
+            globalSchema.Remove("Id");
+
             yield return new ApiDefinition()
             {
                 RelativePath = "/global",
-                ReturnFormat = schema.Global.GetApiReturnFormat(schema).ToString()
+                ReturnFormat = globalSchema.ToString()
             };
 
             foreach (var def in schema.Global.GetApiDefinitions(schema, "/global"))
@@ -51,6 +57,7 @@ namespace DataGraph.Helpers
         public static JObject GetApiReturnFormat(this DataGraphClass classItem, DataGraphSchema schema)
         {
             JObject obj = new JObject();
+            obj.Add("Id", obj.GetHashCode());
 
             foreach (var prop in classItem.Properties)
             {
