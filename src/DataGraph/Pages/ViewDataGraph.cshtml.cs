@@ -24,12 +24,16 @@ namespace DataGraph.Pages
 
         public DataGraphInstance DataGraphInstance { get; set; }
 
+        public string EndpointUrl { get; set; }
+
         public async Task<IActionResult> OnGetAsync(int? id)
         {
             if (id == null)
             {
                 return NotFound();
             }
+
+            EndpointUrl = $"{Request.Scheme}://{Request.Host}/api/graphs/{User.GetCustomerId()}/{id.Value}";
 
             DataGraphInstance = await _context.DataGraph.FirstOrDefaultAsync(m => m.CustomerId == User.GetCustomerId() && m.Id == id.Value);
 

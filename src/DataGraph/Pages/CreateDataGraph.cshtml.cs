@@ -40,6 +40,15 @@ namespace DataGraph.Pages
             }
 
             _context.DataGraph.Add(DataGraphInstance);
+
+            // Configure the global object
+            _context.Objects.Add(new DataGraphObject()
+            {
+                UserId = "",
+                ObjectType = "Global",
+                Graph = DataGraphInstance
+            });
+
             await _context.SaveChangesAsync();
 
             return RedirectToPage("./Index");

@@ -78,6 +78,12 @@ namespace DataGraph.Models
                 prop.Validate(knownTypes);
             }
         }
+
+        public bool TryGetProperty(string propertyName, out DataGraphProperty property)
+        {
+            property = Properties.FirstOrDefault(i => i.Name.Equals(propertyName, StringComparison.CurrentCultureIgnoreCase));
+            return property != null;
+        }
     }
 
     public abstract class DataGraphType

@@ -9,6 +9,10 @@
 
 <h2>User APIs</h2>
 
+<h3>Endpoint</h3>
+
+<pre>@Model.EndpointUrl</pre>
+
 @foreach (var def in Helpers.ApiDefinitionHelper.GetApiDefinitions(Model.DataGraphInstance.Schema))
 {
     <div class="api-definition">

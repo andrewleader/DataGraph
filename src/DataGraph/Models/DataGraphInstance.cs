@@ -60,5 +60,7 @@ namespace DataGraph.Models
             Schema.Validate();
             SchemaJson = JsonConvert.SerializeObject(Schema, _jsonSerializerSettings);
         }
+
+        public virtual ICollection<DataGraphObject> Objects { get; set; }
     }
 }
