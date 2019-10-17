@@ -30,50 +30,59 @@ namespace DataGraph.Controllers.Api
             {
                 case "global":
                     {
-                        var globalSchema = graphSchema.Schema.Global;
-
-                        JObject answer = new JObject();
-
-                        foreach (var literalProp in _context.LiteralPropertyValues.Where(i =>
-                            i.CustomerId == customerId
-                            && i.GraphId == graphId
-                            && i.ObjectId == 1))
-                        {
-                            answer.Add(literalProp.PropertyName, JToken.Parse(literalProp.ProperyValueJson));
-                        }
-
-                        foreach (var listItemLiteral in _context.ListOfLiterals.Where(i =>
-                            i.CustomerId == customerId
-                            && i.GraphId == graphId
-                            && i.ObjectId == 1))
-                        {
-                            JArray array;
-                            if (answer.TryGetValue(listItemLiteral.PropertyName, out JToken token) && token is JArray existingArray)
-                            {
-                                array = existingArray;
-                            }
-                            else
-                            {
-                                array = new JArray();
-                                answer.Add(listItemLiteral.PropertyName, array);
-                            }
-
-                            array.Add(JToken.Parse(listItemLiteral.ListItemValueJson));
-                        }
-
-                        return answer;
+                        return GetObjectJson(customerId, graphId, 1);
                     }
-                    break;
 
                 case "me":
                     {
                         throw new NotImplementedException();
                     }
-                    break;
 
                 default:
                     throw new NotImplementedException();
             }
+        }
+
+        private JObject GetObjectJson(string customerId, int graphId, int objectId)
+        {
+            JObject answer = new JObject();
+
+            foreach (var literalProp in _context.LiteralPropertyValues.Where(i =>
+                i.CustomerId == customerId
+                && i.GraphId == graphId
+                && i.ObjectId == objectId))
+            {
+                answer.Add(literalProp.PropertyName, JToken.Parse(literalProp.ProperyValueJson));
+            }
+
+            foreach (var listItemLiteral in _context.ListOfLiterals.Where(i =>
+                i.CustomerId == customerId
+                && i.GraphId == graphId
+                && i.ObjectId == objectId))
+            {
+                JArray array;
+                if (answer.TryGetValue(listItemLiteral.PropertyName, out JToken token) && token is JArray existingArray)
+                {
+                    array = existingArray;
+                }
+                else
+                {
+                    array = new JArray();
+                    answer.Add(listItemLiteral.PropertyName, array);
+                }
+
+                array.Add(JToken.Parse(listItemLiteral.ListItemValueJson));
+            }
+
+            foreach (var reference in _context.ReferencePropertyValues.Where(i =>
+                            i.CustomerId == customerId
+                            && i.GraphId == graphId
+                            && i.ObjectId == objectId))
+            {
+                answer.Add(reference.PropertyName, GetObjectJson(customerId, graphId, reference.ReferencedObjectId));
+            }
+
+            return answer;
         }
 
         // GET: api/graphs/WindowsLive|f381j31/1/me/cart
@@ -137,6 +146,47 @@ namespace DataGraph.Controllers.Api
         {
         }
 
+        private static void AssertTypeMatches(JToken jtoken, DataGraphProperty property)
+        {
+            // Note that we ignore arrays since the PUT operations don't accept arrays, they accept single values
+            if (property.IsCustomType())
+            {
+                if (jtoken.Type != JTokenType.Object)
+                {
+                    throw new InvalidOperationException();
+                }
+            }
+            else
+            {
+                switch (property.Type)
+                {
+                    case "string":
+                        if (jtoken.Type != JTokenType.String)
+                        {
+                            throw new InvalidOperationException();
+                        }
+                        break;
+
+                    case "int":
+                        if (jtoken.Type != JTokenType.Integer)
+                        {
+                            throw new InvalidOperationException();
+                        }
+                        break;
+
+                    case "decimal":
+                        if (jtoken.Type != JTokenType.Float)
+                        {
+                            throw new InvalidOperationException();
+                        }
+                        break;
+
+                    default:
+                        throw new NotImplementedException();
+                }
+            }
+        }
+
 
         [HttpPut("{customerId}/{graphId}/{entry}/{path}")]
         public void Put(string customerId, int graphId, string entry, string path, [FromBody]JToken json)
@@ -144,67 +194,115 @@ namespace DataGraph.Controllers.Api
             // Ex: api/graphs/{customerId}/{graphId}/global/warningMessage
             // Body: "The new warning message"
 
-            var graphSchema = _context.DataGraph.First(i => i.CustomerId == customerId && i.Id == graphId);
+            var graph = _context.DataGraph.First(i => i.CustomerId == customerId && i.Id == graphId);
             var bodyToken = json;
 
             switch (entry.ToLower())
             {
                 case "global":
                     {
-                        var globalSchema = graphSchema.Schema.Global;
+                        var globalSchema = graph.Schema.Global;
 
                         if (globalSchema.TryGetProperty(path, out DataGraphProperty prop))
                         {
                             // Validate that type matches (note that array vs non array doesn't matter, put only allows adding a single item, not an array)
-                            switch (prop.Type)
-                            {
-                                case "string":
-                                    if (bodyToken.Type != JTokenType.String)
-                                    {
-                                        throw new InvalidOperationException();
-                                    }
-                                    break;
-
-                                case "int":
-                                    if (bodyToken.Type != JTokenType.Integer)
-                                    {
-                                        throw new InvalidOperationException();
-                                    }
-                                    break;
-
-                                case "decimal":
-                                    if (bodyToken.Type != JTokenType.Float)
-                                    {
-                                        throw new InvalidOperationException();
-                                    }
-                                    break;
-
-                                default:
-                                    throw new NotImplementedException();
-                            }
+                            AssertTypeMatches(bodyToken, prop);
 
                             if (!prop.IsArray)
                             {
-                                var existing = _context.LiteralPropertyValues.FirstOrDefault(i =>
-                                                    i.CustomerId == customerId
-                                                    && i.GraphId == graphId
-                                                    && i.ObjectId == 1
-                                                    && i.PropertyName == prop.Name);
-                                if (existing != null)
+                                if (prop.IsCustomType())
                                 {
-                                    // Strings require Formatting.None to output using the "" quotes around the string
-                                    existing.ProperyValueJson = bodyToken.ToString(Newtonsoft.Json.Formatting.None);
-                                }
-                                else
-                                {
-                                    _context.LiteralPropertyValues.Add(new DataGraphLiteralPropertyValue()
+                                    DataGraphReferencePropertyValue literalReference = _context.ReferencePropertyValues.FirstOrDefault(i =>
+                                        i.CustomerId == customerId
+                                        && i.GraphId == graphId
+                                        && i.ObjectId == 1
+                                        && i.PropertyName == prop.Name);
+
+                                    // Nuke the old value
+                                    if (literalReference != null)
+                                    {
+                                        var toDelete = _context.Objects.FirstOrDefault(i =>
+                                            i.CustomerId == customerId
+                                            && i.GraphId == graphId
+                                            && i.ObjectId == literalReference.ObjectId);
+
+                                        if (toDelete != null)
+                                        {
+                                            _context.Objects.Remove(toDelete);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        literalReference = new DataGraphReferencePropertyValue
+                                        {
+                                            CustomerId = customerId,
+                                            GraphId = graphId,
+                                            ObjectId = 1,
+                                            PropertyName = prop.Name
+                                        };
+
+                                        _context.ReferencePropertyValues.Add(literalReference);
+                                    }
+
+                                    var customType = graph.Schema.CustomTypes.First(i => i.ClassName == prop.Type);
+
+                                    var newObject = new DataGraphObject
                                     {
                                         CustomerId = customerId,
                                         GraphId = graphId,
-                                        ObjectId = 1,
-                                        PropertyName = prop.Name,
-                                        ProperyValueJson = bodyToken.ToString(Newtonsoft.Json.Formatting.None)
-                                    });
+                                        ObjectType = customType.ClassName,
+                                        UserId = ""
+                                    };
+
+                                    literalReference.ReferencedObject = newObject;
+
+                                    JObject obj = bodyToken as JObject;
+
+                                    foreach (var p in obj.Properties())
+                                    {
+                                        if (customType.TryGetProperty(p.Name, out DataGraphProperty typeProp))
+                                        {
+                                            // Scoping it to simple props right now
+                                            if (!typeProp.IsCustomType() && !typeProp.IsArray)
+                                            {
+                                                AssertTypeMatches(p.Value, typeProp);
+
+                                                _context.LiteralPropertyValues.Add(new DataGraphLiteralPropertyValue()
+                                                {
+                                                    CustomerId = customerId,
+                                                    GraphId = graphId,
+                                                    Object = newObject,
+                                                    PropertyName = typeProp.Name,
+                                                    ProperyValueJson = p.Value.ToString(Newtonsoft.Json.Formatting.None)
+                                                });
+                                            }
+                                        }
+                                    }
+                                }
+
+                                else
+                                {
+                                    var existing = _context.LiteralPropertyValues.FirstOrDefault(i =>
+                                                        i.CustomerId == customerId
+                                                        && i.GraphId == graphId
+                                                        && i.ObjectId == 1
+                                                        && i.PropertyName == prop.Name);
+                                    if (existing != null)
+                                    {
+                                        // Strings require Formatting.None to output using the "" quotes around the string
+                                        existing.ProperyValueJson = bodyToken.ToString(Newtonsoft.Json.Formatting.None);
+                                    }
+                                    else
+                                    {
+                                        _context.LiteralPropertyValues.Add(new DataGraphLiteralPropertyValue()
+                                        {
+                                            CustomerId = customerId,
+                                            GraphId = graphId,
+                                            ObjectId = 1,
+                                            PropertyName = prop.Name,
+                                            ProperyValueJson = bodyToken.ToString(Newtonsoft.Json.Formatting.None)
+                                        });
+                                    }
                                 }
 
                                 _context.SaveChanges();
