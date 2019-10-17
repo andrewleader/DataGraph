@@ -20,6 +20,62 @@ namespace DataGraph.Controllers.Api
             _context = context;
         }
 
+        // GET: api/graphs/WindowsLive|f381j31/1/global
+        [HttpGet("{customerId}/{graphId}/{entry}")]
+        public JObject Get(string customerId, int graphId, string entry)
+        {
+            var graphSchema = _context.DataGraph.First(i => i.CustomerId == customerId && i.Id == graphId);
+
+            switch (entry.ToLower())
+            {
+                case "global":
+                    {
+                        var globalSchema = graphSchema.Schema.Global;
+
+                        JObject answer = new JObject();
+
+                        foreach (var literalProp in _context.LiteralPropertyValues.Where(i =>
+                            i.CustomerId == customerId
+                            && i.GraphId == graphId
+                            && i.ObjectId == 1))
+                        {
+                            answer.Add(literalProp.PropertyName, JToken.Parse(literalProp.ProperyValueJson));
+                        }
+
+                        foreach (var listItemLiteral in _context.ListOfLiterals.Where(i =>
+                            i.CustomerId == customerId
+                            && i.GraphId == graphId
+                            && i.ObjectId == 1))
+                        {
+                            JArray array;
+                            if (answer.TryGetValue(listItemLiteral.PropertyName, out JToken token) && token is JArray existingArray)
+                            {
+                                array = existingArray;
+                            }
+                            else
+                            {
+                                array = new JArray();
+                                answer.Add(listItemLiteral.PropertyName, array);
+                            }
+
+                            array.Add(JToken.Parse(listItemLiteral.ListItemValueJson));
+                        }
+
+                        return answer;
+                    }
+                    break;
+
+                case "me":
+                    {
+                        throw new NotImplementedException();
+                    }
+                    break;
+
+                default:
+                    throw new NotImplementedException();
+            }
+        }
+
         // GET: api/graphs/WindowsLive|f381j31/1/me/cart
         [HttpGet("{customerId}/{graphId}/{entry}/{path}")]
         public JToken Get(string customerId, int graphId, string entry, string path)
@@ -36,7 +92,14 @@ namespace DataGraph.Controllers.Api
                         {
                             if (!prop.IsCustomType())
                             {
-                                return JToken.Parse(graphSchema.Objects.First().LiteralPropertyValues.First(i => i.PropertyName == prop.Name).ProperyValueJson);
+                                var json = _context.LiteralPropertyValues.First(i =>
+                                    i.CustomerId == customerId
+                                    && i.GraphId == graphId
+                                    && i.ObjectId == 1
+                                    && i.PropertyName == prop.Name).ProperyValueJson;
+
+                                var token = JToken.Parse(json);
+                                return token;
                             }
                             else
                             {
@@ -76,7 +139,7 @@ namespace DataGraph.Controllers.Api
 
 
         [HttpPut("{customerId}/{graphId}/{entry}/{path}")]
-        public async void Put(string customerId, int graphId, string entry, string path, [FromBody]JToken json)
+        public void Put(string customerId, int graphId, string entry, string path, [FromBody]JToken json)
         {
             // Ex: api/graphs/{customerId}/{graphId}/global/warningMessage
             // Body: "The new warning message"
@@ -92,35 +155,81 @@ namespace DataGraph.Controllers.Api
 
                         if (globalSchema.TryGetProperty(path, out DataGraphProperty prop))
                         {
+                            // Validate that type matches (note that array vs non array doesn't matter, put only allows adding a single item, not an array)
                             switch (prop.Type)
                             {
                                 case "string":
+                                    if (bodyToken.Type != JTokenType.String)
                                     {
-                                        if (!prop.IsArray)
-                                        {
-                                            if (bodyToken.Type == JTokenType.String)
-                                            {
-                                                graphSchema.Objects.First().LiteralPropertyValues.Add(new DataGraphLiteralPropertyValue
-                                                {
-                                                    PropertyName = prop.Name,
-                                                    ProperyValueJson = bodyToken.ToString()
-                                                });
-                                                await _context.SaveChangesAsync();
-                                            }
-                                            else
-                                            {
-                                                throw new InvalidOperationException("Incorrect type");
-                                            }
-                                        }
-                                        else
-                                        {
-                                            throw new InvalidOperationException("Incorrect type");
-                                        }
+                                        throw new InvalidOperationException();
+                                    }
+                                    break;
+
+                                case "int":
+                                    if (bodyToken.Type != JTokenType.Integer)
+                                    {
+                                        throw new InvalidOperationException();
+                                    }
+                                    break;
+
+                                case "decimal":
+                                    if (bodyToken.Type != JTokenType.Float)
+                                    {
+                                        throw new InvalidOperationException();
                                     }
                                     break;
 
                                 default:
-                                    throw new InvalidOperationException("Incorrect type");
+                                    throw new NotImplementedException();
+                            }
+
+                            if (!prop.IsArray)
+                            {
+                                var existing = _context.LiteralPropertyValues.FirstOrDefault(i =>
+                                                    i.CustomerId == customerId
+                                                    && i.GraphId == graphId
+                                                    && i.ObjectId == 1
+                                                    && i.PropertyName == prop.Name);
+                                if (existing != null)
+                                {
+                                    // Strings require Formatting.None to output using the "" quotes around the string
+                                    existing.ProperyValueJson = bodyToken.ToString(Newtonsoft.Json.Formatting.None);
+                                }
+                                else
+                                {
+                                    _context.LiteralPropertyValues.Add(new DataGraphLiteralPropertyValue()
+                                    {
+                                        CustomerId = customerId,
+                                        GraphId = graphId,
+                                        ObjectId = 1,
+                                        PropertyName = prop.Name,
+                                        ProperyValueJson = bodyToken.ToString(Newtonsoft.Json.Formatting.None)
+                                    });
+                                }
+
+                                _context.SaveChanges();
+                            }
+                            else
+                            {
+                                // Arrays
+
+                                if (!prop.IsCustomType())
+                                {
+                                    _context.ListOfLiterals.Add(new DataGraphListOfLiteralsPropertyValue
+                                    {
+                                        CustomerId = customerId,
+                                        GraphId = graphId,
+                                        ObjectId = 1,
+                                        PropertyName = prop.Name,
+                                        ListItemValueJson = bodyToken.ToString(Newtonsoft.Json.Formatting.None)
+                                    });
+                                }
+                                else
+                                {
+                                    throw new NotImplementedException();
+                                }
+
+                                _context.SaveChanges();
                             }
                         }
                         else

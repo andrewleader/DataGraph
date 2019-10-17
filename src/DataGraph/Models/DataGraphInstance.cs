@@ -61,6 +61,6 @@ namespace DataGraph.Models
             SchemaJson = JsonConvert.SerializeObject(Schema, _jsonSerializerSettings);
         }
 
-        public virtual ICollection<DataGraphObject> Objects { get; set; }
+        public virtual ICollection<DataGraphObject> Objects { get; set; } = new HashSet<DataGraphObject>();
     }
 }

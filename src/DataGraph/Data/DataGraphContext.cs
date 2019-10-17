@@ -32,9 +32,11 @@ namespace DataGraph.Data
 
             modelBuilder.Entity<DataGraphListOfLiteralsPropertyValue>()
                 .HasKey(i => new { i.CustomerId, i.GraphId, i.ObjectId, i.PropertyName, i.ListItemId });
+            modelBuilder.Entity<DataGraphListOfLiteralsPropertyValue>().Property(p => p.ListItemId).ValueGeneratedOnAdd();
 
             modelBuilder.Entity<DataGraphListOfReferencesPropertyValue>()
-                .HasKey(i => new { i.CustomerId, i.GraphId, i.ObjectId, i.PropertyName, i.ReferencedObjectId });
+                .HasKey(i => new { i.CustomerId, i.GraphId, i.ObjectId, i.PropertyName, i.ListItemId });
+            modelBuilder.Entity<DataGraphListOfReferencesPropertyValue>().Property(p => p.ListItemId).ValueGeneratedOnAdd();
 
             //modelBuilder.Entity<DataGraphObject>()
             //    .HasOne(i => i.Graph)

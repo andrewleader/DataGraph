@@ -52,7 +52,8 @@ namespace DataGraph.Migrations
                     GraphId = table.Column<int>(nullable: false),
                     ObjectId = table.Column<int>(nullable: false),
                     PropertyName = table.Column<string>(nullable: false),
-                    ListItemId = table.Column<int>(nullable: false),
+                    ListItemId = table.Column<int>(nullable: false)
+                        .Annotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn),
                     ListItemValueJson = table.Column<string>(nullable: true)
                 },
                 constraints: table =>
@@ -75,11 +76,14 @@ namespace DataGraph.Migrations
                     GraphId = table.Column<int>(nullable: false),
                     ObjectId = table.Column<int>(nullable: false),
                     PropertyName = table.Column<string>(nullable: false),
+                    ListItemId = table.Column<int>(nullable: false)
+                        .Annotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn),
                     ReferencedObjectId = table.Column<int>(nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_ListOfReferences", x => new { x.CustomerId, x.GraphId, x.ObjectId, x.PropertyName, x.ReferencedObjectId });
+                    table.PrimaryKey("PK_ListOfReferences", x => new { x.CustomerId, x.GraphId, x.ObjectId, x.PropertyName, x.ListItemId });
+                    table.UniqueConstraint("AK_ListOfReferences_CustomerId_GraphId_ListItemId_ObjectId_PropertyName", x => new { x.CustomerId, x.GraphId, x.ListItemId, x.ObjectId, x.PropertyName });
                     table.ForeignKey(
                         name: "FK_ListOfReferences_Objects_CustomerId_GraphId_ObjectId",
                         columns: x => new { x.CustomerId, x.GraphId, x.ObjectId },

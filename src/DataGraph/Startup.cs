@@ -100,7 +100,9 @@ namespace DataGraph
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
 
             services.AddDbContext<DataGraphContext>(options =>
-                    options.UseSqlServer(Configuration.GetConnectionString("DataGraphContext")));
+            {
+                options.UseSqlServer(Configuration.GetConnectionString("DataGraphContext"));
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

@@ -46,7 +46,9 @@ namespace DataGraph.Migrations
 
                     b.Property<string>("PropertyName");
 
-                    b.Property<int>("ListItemId");
+                    b.Property<int>("ListItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
 
                     b.Property<string>("ListItemValueJson");
 
@@ -67,9 +69,15 @@ namespace DataGraph.Migrations
 
                     b.Property<string>("PropertyName");
 
+                    b.Property<int>("ListItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
+
                     b.Property<int>("ReferencedObjectId");
 
-                    b.HasKey("CustomerId", "GraphId", "ObjectId", "PropertyName", "ReferencedObjectId");
+                    b.HasKey("CustomerId", "GraphId", "ObjectId", "PropertyName", "ListItemId");
+
+                    b.HasAlternateKey("CustomerId", "GraphId", "ListItemId", "ObjectId", "PropertyName");
 
                     b.HasIndex("CustomerId", "GraphId", "ReferencedObjectId");
 

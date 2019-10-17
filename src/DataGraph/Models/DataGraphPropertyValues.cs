@@ -49,10 +49,12 @@ namespace DataGraph.Models
 
     public class DataGraphListOfReferencesPropertyValue : BaseDataGraphPropertyValue
     {
-        /// <summary>
-        /// This time it's a key
-        /// </summary>
         [Key]
+        public int ListItemId { get; set; }
+
+        /// <summary>
+        /// We don't make this a key, since a list could contain references to the same item multiple times if it wishes
+        /// </summary>
         public int ReferencedObjectId { get; set; }
 
         [ForeignKey(nameof(CustomerId) + ", " + nameof(GraphId) + ", " + nameof(ReferencedObjectId))]
