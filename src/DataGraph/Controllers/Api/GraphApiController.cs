@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using DataGraph.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Samples.EFLogging;
 using Newtonsoft.Json.Linq;
 
 namespace DataGraph.Controllers.Api
@@ -18,19 +20,23 @@ namespace DataGraph.Controllers.Api
         public GraphApiController(Data.DataGraphContext context)
         {
             _context = context;
+
+#if DEBUG
+            _context.ConfigureLogging(s => Debug.WriteLine(s));
+#endif
         }
 
         // GET: api/graphs/WindowsLive|f381j31/1/global
         [HttpGet("{customerId}/{graphId}/{entry}")]
         public JObject Get(string customerId, int graphId, string entry)
         {
-            var graphSchema = _context.DataGraph.First(i => i.CustomerId == customerId && i.Id == graphId);
+            var graph = _context.DataGraph.First(i => i.CustomerId == customerId && i.Id == graphId);
 
             switch (entry.ToLower())
             {
                 case "global":
                     {
-                        return GetObjectJson(customerId, graphId, 1);
+                        return GetObjectJson(customerId, graphId, graph.GlobalObjectId);
                     }
 
                 case "me":
@@ -108,13 +114,13 @@ namespace DataGraph.Controllers.Api
         [HttpGet("{customerId}/{graphId}/{entry}/{path}")]
         public JToken Get(string customerId, int graphId, string entry, string path)
         {
-            var graphSchema = _context.DataGraph.First(i => i.CustomerId == customerId && i.Id == graphId);
+            var graph = _context.DataGraph.First(i => i.CustomerId == customerId && i.Id == graphId);
 
             switch (entry.ToLower())
             {
                 case "global":
                     {
-                        var globalSchema = graphSchema.Schema.Global;
+                        var globalSchema = graph.Schema.Global;
 
                         if (globalSchema.TryGetProperty(path, out DataGraphProperty prop))
                         {
@@ -123,7 +129,7 @@ namespace DataGraph.Controllers.Api
                                 var json = _context.LiteralPropertyValues.First(i =>
                                     i.CustomerId == customerId
                                     && i.GraphId == graphId
-                                    && i.ObjectId == 1
+                                    && i.ObjectId == graph.GlobalObjectId
                                     && i.PropertyName == prop.Name).ProperyValueJson;
 
                                 var token = JToken.Parse(json);
@@ -268,7 +274,7 @@ namespace DataGraph.Controllers.Api
                                     DataGraphReferencePropertyValue literalReference = _context.ReferencePropertyValues.FirstOrDefault(i =>
                                         i.CustomerId == customerId
                                         && i.GraphId == graphId
-                                        && i.ObjectId == 1
+                                        && i.ObjectId == graph.GlobalObjectId
                                         && i.PropertyName == prop.Name);
 
                                     // Nuke the old value
@@ -290,7 +296,7 @@ namespace DataGraph.Controllers.Api
                                         {
                                             CustomerId = customerId,
                                             GraphId = graphId,
-                                            ObjectId = 1,
+                                            ObjectId = graph.GlobalObjectId,
                                             PropertyName = prop.Name
                                         };
 
@@ -307,7 +313,7 @@ namespace DataGraph.Controllers.Api
                                     var existing = _context.LiteralPropertyValues.FirstOrDefault(i =>
                                                         i.CustomerId == customerId
                                                         && i.GraphId == graphId
-                                                        && i.ObjectId == 1
+                                                        && i.ObjectId == graph.GlobalObjectId
                                                         && i.PropertyName == prop.Name);
                                     if (existing != null)
                                     {
@@ -320,7 +326,7 @@ namespace DataGraph.Controllers.Api
                                         {
                                             CustomerId = customerId,
                                             GraphId = graphId,
-                                            ObjectId = 1,
+                                            ObjectId = graph.GlobalObjectId,
                                             PropertyName = prop.Name,
                                             ProperyValueJson = bodyToken.ToString(Newtonsoft.Json.Formatting.None)
                                         });
@@ -339,7 +345,7 @@ namespace DataGraph.Controllers.Api
                                     {
                                         CustomerId = customerId,
                                         GraphId = graphId,
-                                        ObjectId = 1,
+                                        ObjectId = graph.GlobalObjectId,
                                         PropertyName = prop.Name,
                                         ListItemValueJson = bodyToken.ToString(Newtonsoft.Json.Formatting.None)
                                     });
@@ -348,14 +354,26 @@ namespace DataGraph.Controllers.Api
                                 {
                                     var customType = graph.Schema.CustomTypes.First(i => i.ClassName == prop.Type);
 
+                                    var dbObj = AddObject(customerId, graphId, "", customType, json as JObject);
+                                    _context.SaveChanges();
+
                                     _context.ListOfReferences.Add(new DataGraphListOfReferencesPropertyValue
                                     {
                                         CustomerId = customerId,
                                         GraphId = graphId,
-                                        ObjectId = 1,
+                                        ObjectId = graph.GlobalObjectId,
                                         PropertyName = prop.Name,
-                                        ReferencedObject = AddObject(customerId, graphId, "", customType, json as JObject)
+                                        ReferencedObject = dbObj
                                     });
+
+                                    //_context.ListOfReferences.Add(new DataGraphListOfReferencesPropertyValue
+                                    //{
+                                    //    CustomerId = customerId,
+                                    //    GraphId = graphId,
+                                    //    ObjectId = graph.GlobalObjectId,
+                                    //    PropertyName = prop.Name,
+                                    //    ReferencedObject = AddObject(customerId, graphId, "", customType, json as JObject)
+                                    //});
                                 }
 
                                 _context.SaveChanges();

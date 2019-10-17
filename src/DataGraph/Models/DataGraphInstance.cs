@@ -55,6 +55,8 @@ namespace DataGraph.Models
             }
         }
 
+        public int GlobalObjectId { get; set; }
+
         public void ApplySchemaChanges()
         {
             Schema.Validate();

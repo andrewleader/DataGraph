@@ -14,6 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using DataGraph.Data;
+using Microsoft.Extensions.Logging;
 
 namespace DataGraph
 {
@@ -102,6 +103,7 @@ namespace DataGraph
             services.AddDbContext<DataGraphContext>(options =>
             {
                 options.UseSqlServer(Configuration.GetConnectionString("DataGraphContext"));
+                //options.UseLoggerFactory(LoggerFactory.)
             });
         }
 

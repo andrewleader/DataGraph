@@ -42,12 +42,17 @@ namespace DataGraph.Pages
             _context.DataGraph.Add(DataGraphInstance);
 
             // Configure the global object
-            _context.Objects.Add(new DataGraphObject()
+            var globalObj = new DataGraphObject()
             {
                 UserId = "",
                 ObjectType = "Global",
                 Graph = DataGraphInstance
-            });
+            };
+            _context.Objects.Add(globalObj);
+
+            await _context.SaveChangesAsync();
+
+            DataGraphInstance.GlobalObjectId = globalObj.ObjectId;
 
             await _context.SaveChangesAsync();
 

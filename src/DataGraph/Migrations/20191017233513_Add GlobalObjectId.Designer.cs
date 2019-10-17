@@ -3,14 +3,16 @@ using DataGraph.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace DataGraph.Migrations
 {
     [DbContext(typeof(DataGraphContext))]
-    partial class DataGraphContextModelSnapshot : ModelSnapshot
+    [Migration("20191017233513_Add GlobalObjectId")]
+    partial class AddGlobalObjectId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
