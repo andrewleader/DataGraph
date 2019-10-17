@@ -26,12 +26,13 @@
     <partial name="_EditableDataGraphClass" model="new EditableDataGraphClassModel(Model.DataGraphInstance.Schema, type)" />
 }
 
-<form method="post">
+<button class="btn btn-primary" onclick="toggle('AddClass')">Add class</button>
+<form method="post" id="AddClass" style="display: none">
     <div class="form-group">
         <label class="control-label">Class name</label>
         <input name="ClassName" class="form-control" type="text" />
     </div>
     <div class="form-group">
-        <input type="submit" name="OperationType" value="Add class" class="btn btn-primary" />
+        <input type="submit" name="OperationType" value="Save class" class="btn btn-primary" />
     </div>
 </form>

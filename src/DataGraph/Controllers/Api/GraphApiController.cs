@@ -82,6 +82,25 @@ namespace DataGraph.Controllers.Api
                 answer.Add(reference.PropertyName, GetObjectJson(customerId, graphId, reference.ReferencedObjectId));
             }
 
+            foreach (var listItemRef in _context.ListOfReferences.Where(i =>
+                i.CustomerId == customerId
+                && i.GraphId == graphId
+                && i.ObjectId == objectId))
+            {
+                JArray array;
+                if (answer.TryGetValue(listItemRef.PropertyName, out JToken token) && token is JArray existingArray)
+                {
+                    array = existingArray;
+                }
+                else
+                {
+                    array = new JArray();
+                    answer.Add(listItemRef.PropertyName, array);
+                }
+
+                array.Add(GetObjectJson(customerId, graphId, listItemRef.ReferencedObjectId));
+            }
+
             return answer;
         }
 
@@ -187,6 +206,40 @@ namespace DataGraph.Controllers.Api
             }
         }
 
+        private DataGraphObject AddObject(string customerId, int graphId, string userId, DataGraphClass customType, JObject obj)
+        {
+            var newObject = new DataGraphObject
+            {
+                CustomerId = customerId,
+                GraphId = graphId,
+                ObjectType = customType.ClassName,
+                UserId = userId
+            };
+
+            foreach (var p in obj.Properties())
+            {
+                if (customType.TryGetProperty(p.Name, out DataGraphProperty typeProp))
+                {
+                    // Scoping it to simple props right now
+                    if (!typeProp.IsCustomType() && !typeProp.IsArray)
+                    {
+                        AssertTypeMatches(p.Value, typeProp);
+
+                        _context.LiteralPropertyValues.Add(new DataGraphLiteralPropertyValue()
+                        {
+                            CustomerId = customerId,
+                            GraphId = graphId,
+                            Object = newObject,
+                            PropertyName = typeProp.Name,
+                            ProperyValueJson = p.Value.ToString(Newtonsoft.Json.Formatting.None)
+                        });
+                    }
+                }
+            }
+
+            return newObject;
+        }
+
 
         [HttpPut("{customerId}/{graphId}/{entry}/{path}")]
         public void Put(string customerId, int graphId, string entry, string path, [FromBody]JToken json)
@@ -246,38 +299,7 @@ namespace DataGraph.Controllers.Api
 
                                     var customType = graph.Schema.CustomTypes.First(i => i.ClassName == prop.Type);
 
-                                    var newObject = new DataGraphObject
-                                    {
-                                        CustomerId = customerId,
-                                        GraphId = graphId,
-                                        ObjectType = customType.ClassName,
-                                        UserId = ""
-                                    };
-
-                                    literalReference.ReferencedObject = newObject;
-
-                                    JObject obj = bodyToken as JObject;
-
-                                    foreach (var p in obj.Properties())
-                                    {
-                                        if (customType.TryGetProperty(p.Name, out DataGraphProperty typeProp))
-                                        {
-                                            // Scoping it to simple props right now
-                                            if (!typeProp.IsCustomType() && !typeProp.IsArray)
-                                            {
-                                                AssertTypeMatches(p.Value, typeProp);
-
-                                                _context.LiteralPropertyValues.Add(new DataGraphLiteralPropertyValue()
-                                                {
-                                                    CustomerId = customerId,
-                                                    GraphId = graphId,
-                                                    Object = newObject,
-                                                    PropertyName = typeProp.Name,
-                                                    ProperyValueJson = p.Value.ToString(Newtonsoft.Json.Formatting.None)
-                                                });
-                                            }
-                                        }
-                                    }
+                                    literalReference.ReferencedObject = AddObject(customerId, graphId, "", customType, json as JObject);
                                 }
 
                                 else
@@ -324,7 +346,16 @@ namespace DataGraph.Controllers.Api
                                 }
                                 else
                                 {
-                                    throw new NotImplementedException();
+                                    var customType = graph.Schema.CustomTypes.First(i => i.ClassName == prop.Type);
+
+                                    _context.ListOfReferences.Add(new DataGraphListOfReferencesPropertyValue
+                                    {
+                                        CustomerId = customerId,
+                                        GraphId = graphId,
+                                        ObjectId = 1,
+                                        PropertyName = prop.Name,
+                                        ReferencedObject = AddObject(customerId, graphId, "", customType, json as JObject)
+                                    });
                                 }
 
                                 _context.SaveChanges();

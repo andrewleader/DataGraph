@@ -58,7 +58,7 @@ namespace DataGraph.Pages
             // Adding a property to existing class
             switch (operationType)
             {
-                case "Add property":
+                case "Save property":
                     {
                         string className = values["ClassName"];
 
@@ -86,7 +86,7 @@ namespace DataGraph.Pages
                     }
                     break;
 
-                case "Add class":
+                case "Save class":
                     {
                         string className = values["ClassName"];
 

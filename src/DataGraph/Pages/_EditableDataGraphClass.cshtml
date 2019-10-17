@@ -9,7 +9,9 @@
         </li>
     }
 </ul>
-<form method="post" asp-action="AddProperty">
+
+<button class="btn btn-primary" onclick="toggle('@("AddProperty" + Model.Class.ClassName)')">Add property</button>
+<form method="post" asp-action="AddProperty" id="@("AddProperty" + Model.Class.ClassName)" style="display: none">
     <input hidden name="ClassName" value="@Model.Class.ClassName" />
     <div class="form-group">
         <label class="control-label">Property name</label>
@@ -32,6 +34,6 @@
         <input name="IsArray" type="checkbox" class="form-control"/>
     </div>
     <div class="form-group">
-        <input type="submit" name="OperationType" value="Add property" class="btn btn-primary" />
+        <input type="submit" name="OperationType" value="Save property" class="btn btn-primary" />
     </div>
 </form>
