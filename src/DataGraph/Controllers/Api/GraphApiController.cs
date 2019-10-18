@@ -49,7 +49,13 @@ namespace DataGraph.Controllers.Api
 
                 case "me":
                     {
-                        throw new NotImplementedException();
+                        var userId = AuthUser();
+
+                        int userObjId = GetUserObjectId(customerId, graphId, userId);
+
+                        var userObj = GetObjectJson(customerId, graphId, userObjId);
+                        userObj.Remove("Id");
+                        return userObj;
                     }
 
                 default:
@@ -57,7 +63,14 @@ namespace DataGraph.Controllers.Api
             }
         }
 
-
+        private int GetUserObjectId(string customerId, int graphId, string userId)
+        {
+            return _context.Objects.Where(i =>
+                i.CustomerId == customerId
+                && i.GraphId == graphId
+                && i.UserId == userId
+                && i.ObjectType == "User").Select(i => i.ObjectId).First();
+        }
 
 
         [HttpGet("{customerId}/{graphId}/global/{propArray}/{itemId}")]
@@ -196,6 +209,67 @@ namespace DataGraph.Controllers.Api
             return answer;
         }
 
+        public JToken GetPropertyValueJson(string customerId, int graphId, int objectId, DataGraphProperty prop)
+        {
+            if (!prop.IsCustomType())
+            {
+                if (!prop.IsArray)
+                {
+                    var json = _context.LiteralPropertyValues.First(i =>
+                        i.CustomerId == customerId
+                        && i.GraphId == graphId
+                        && i.ObjectId == objectId
+                        && i.PropertyName == prop.Name).ProperyValueJson;
+
+                    var token = JToken.Parse(json);
+                    return token;
+                }
+                else
+                {
+                    JArray array = new JArray();
+
+                    foreach (var itemValueJson in _context.ListOfLiterals.Where(i =>
+                        i.CustomerId == customerId
+                        && i.GraphId == graphId
+                        && i.ObjectId == objectId
+                        && i.PropertyName == prop.Name).Select(i => i.ListItemValueJson))
+                    {
+                        array.Add(JToken.Parse(itemValueJson));
+                    }
+
+                    return array;
+                }
+            }
+            else
+            {
+                if (!prop.IsArray)
+                {
+                    int refObjId = _context.ReferencePropertyValues.Where(i =>
+                        i.CustomerId == customerId
+                        && i.GraphId == graphId
+                        && i.ObjectId == objectId
+                        && i.PropertyName == prop.Name).Select(i => i.ReferencedObjectId).First();
+
+                    return GetObjectJson(customerId, graphId, refObjId);
+                }
+                else
+                {
+                    JArray array = new JArray();
+
+                    foreach (var refObjId in _context.ListOfReferences.Where(i =>
+                        i.CustomerId == customerId
+                        && i.GraphId == graphId
+                        && i.ObjectId == objectId
+                        && i.PropertyName == prop.Name).Select(i => i.ReferencedObjectId))
+                    {
+                        array.Add(GetObjectJson(customerId, graphId, refObjId));
+                    }
+
+                    return array;
+                }
+            }
+        }
+
         // GET: api/graphs/WindowsLive|f381j31/1/me/cart
         [HttpGet("{customerId}/{graphId}/{entry}/{path}")]
         public JToken Get(string customerId, int graphId, string entry, string path)
@@ -210,21 +284,7 @@ namespace DataGraph.Controllers.Api
 
                         if (globalSchema.TryGetProperty(path, out DataGraphProperty prop))
                         {
-                            if (!prop.IsCustomType())
-                            {
-                                var json = _context.LiteralPropertyValues.First(i =>
-                                    i.CustomerId == customerId
-                                    && i.GraphId == graphId
-                                    && i.ObjectId == graph.GlobalObjectId
-                                    && i.PropertyName == prop.Name).ProperyValueJson;
-
-                                var token = JToken.Parse(json);
-                                return token;
-                            }
-                            else
-                            {
-                                throw new NotImplementedException();
-                            }
+                            return GetPropertyValueJson(customerId, graphId, graph.GlobalObjectId, prop);
                         }
                         else
                         {
@@ -235,20 +295,26 @@ namespace DataGraph.Controllers.Api
 
                 case "me":
                     {
-                        throw new NotImplementedException();
+                        var userId = AuthUser();
+
+                        var userSchema = graph.Schema.User;
+
+                        if (userSchema.TryGetProperty(path, out DataGraphProperty prop))
+                        {
+                            int userObjId = GetUserObjectId(customerId, graphId, userId);
+
+                            return GetPropertyValueJson(customerId, graphId, userObjId, prop);
+                        }
+                        else
+                        {
+                            throw new KeyNotFoundException();
+                        }
                     }
                     break;
 
                 default:
                     throw new NotImplementedException();
             }
-        }
-
-        // GET: api/GraphApi/5
-        [HttpGet("{id}", Name = "Get")]
-        public string Get(int id)
-        {
-            return "value";
         }
 
         // POST: api/GraphApi
@@ -338,11 +404,8 @@ namespace DataGraph.Controllers.Api
             return newObject;
         }
 
-        [HttpPut("{customerId}/{graphId}/me/{path}")]
-        public void PutForUser(string customerId, int graphId, string path, [FromBody]JToken json)
+        private string AuthUser()
         {
-            string userId = "TODO";
-
             if (Request.Headers.TryGetValue("Authorization", out StringValues authValues))
             {
                 var authVal = authValues.First();
@@ -364,7 +427,7 @@ namespace DataGraph.Controllers.Api
                     // TODO: Need to validate issuer matches the allowed issuer of the DataGraph
                     // TODO: Need to validate issuer signature
 
-                    userId = tokenObj.Value<string>("sub");
+                    return tokenObj.Value<string>("sub");
                 }
                 else
                 {
@@ -375,7 +438,12 @@ namespace DataGraph.Controllers.Api
             {
                 throw new InvalidOperationException("Authorization header wasn't provided");
             }
+        }
 
+        [HttpPut("{customerId}/{graphId}/me/{path}")]
+        public void PutForUser(string customerId, int graphId, string path, [FromBody]JToken json)
+        {
+            string userId = AuthUser();
 
             var graph = _context.DataGraph.First(i => i.CustomerId == customerId && i.Id == graphId);
 

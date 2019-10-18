@@ -1,8 +1,9 @@
 import React, { Fragment } from "react";
 
 import Hero from "../components/Hero";
-import Content from "../components/Content";
+// import Content from "../components/Content";
 import Donuts from "../components/Donuts";
+import Cart from "../components/Cart";
 
 const Home = () => (
   <Fragment>
@@ -10,6 +11,7 @@ const Home = () => (
     <hr />
     {/* <Content /> */}
     <Donuts />
+    <Cart />
   </Fragment>
 );
 
