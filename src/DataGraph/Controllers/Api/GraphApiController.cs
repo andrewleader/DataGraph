@@ -22,7 +22,7 @@ namespace DataGraph.Controllers.Api
             _context = context;
 
 #if DEBUG
-            _context.ConfigureLogging(s => Debug.WriteLine(s));
+            //_context.ConfigureLogging(s => Debug.WriteLine(s));
 #endif
         }
 
