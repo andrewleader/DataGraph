@@ -97,7 +97,7 @@ namespace DataGraph
                 };
             });
 
-
+            services.AddCors(); // Needs to be called before AddMvc
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
 
             services.AddDbContext<DataGraphContext>(options =>
@@ -120,6 +120,12 @@ namespace DataGraph
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 app.UseHsts();
             }
+
+            app.UseCors(builder => builder
+                .AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader()
+                .AllowCredentials()); // Needs to be called before UseMvc
 
             app.UseHttpsRedirection();
             app.UseStaticFiles();
