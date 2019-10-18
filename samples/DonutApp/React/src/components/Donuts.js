@@ -4,6 +4,7 @@ import { Row, Col, Button } from "reactstrap";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 import { useAuth0 } from "../react-auth0-spa";
+import api from "../utils/api";
 
 const Donuts = () => {
 
@@ -11,7 +12,7 @@ const Donuts = () => {
     const [error, setError] = useState(null);
     const { getTokenSilently } = useAuth0();
     React.useEffect(() => {
-        fetch('https://localhost:44397/api/graphs/windowslive|7d1cac342168ec7f/2/global')
+        fetch(api.baseUrl + '/global')
         .then(results => {
             return results.json();
         }).then(data => {
@@ -22,29 +23,13 @@ const Donuts = () => {
         });
     });
 
-    // componentDidMount() {
-    //     fetch('https://localhost:44397/api/graphs/windowslive|7d1cac342168ec7f/2/global')
-    //     .then(results => {
-    //         return results.json();
-    //     }).then(data => {
-    //         this.setState({
-    //             donuts: data.Donuts
-    //         });
-    //     }).catch(error => {
-    //         console.log(error);
-    //         this.setState({
-    //             error: 'Failed to load'
-    //         });
-    //     });
-    // }
-
     const addToCart = async (donutId) => {
         try {
             var token = await getTokenSilently();
             console.log("Token: " + token);
             // return;
 
-            const response = await fetch('https://localhost:44397/api/graphs/windowslive|7d1cac342168ec7f/2/me/donutsInCart', {
+            const response = await fetch(api.baseUrl + '/me/donutsInCart', {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

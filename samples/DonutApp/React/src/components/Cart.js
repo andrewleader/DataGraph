@@ -5,6 +5,8 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 import { useAuth0 } from "../react-auth0-spa";
 
+import api from "../utils/api";
+
 const Cart = () => {
 
     const [donuts, setDonuts] = useState(null);
@@ -16,7 +18,7 @@ const Cart = () => {
         async function fetchData() {
             try {
                 var token = await getTokenSilently();
-                const response = await fetch('https://localhost:44397/api/graphs/windowslive|7d1cac342168ec7f/2/me/donutsInCart', {
+                const response = await fetch(api.baseUrl + '/me/donutsInCart', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
