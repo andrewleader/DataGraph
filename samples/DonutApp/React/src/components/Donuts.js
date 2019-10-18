@@ -41,6 +41,8 @@ const Donuts = () => {
     const addToCart = async (donutId) => {
         try {
             var token = await getTokenSilently();
+            console.log("Token: " + token);
+            // return;
 
             const response = await fetch('https://localhost:44397/api/graphs/windowslive|7d1cac342168ec7f/2/me/donutsInCart', {
                 method: 'PUT',
@@ -53,7 +55,7 @@ const Donuts = () => {
 
             alert("Added!");
         } catch (err) {
-            alert(err);
+            alert(JSON.stringify(err));
         }
     }
 

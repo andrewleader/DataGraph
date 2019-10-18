@@ -1,11 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
+using System.Security;
 using System.Threading.Tasks;
 using DataGraph.Models;
+using JWT;
+using JWT.Serializers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Primitives;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.Samples.EFLogging;
 using Newtonsoft.Json.Linq;
 
@@ -256,9 +262,15 @@ namespace DataGraph.Controllers.Api
             // Note that we ignore arrays since the PUT operations don't accept arrays, they accept single values
             if (property.IsCustomType())
             {
-                if (jtoken.Type != JTokenType.Object)
+                switch (jtoken.Type)
                 {
-                    throw new InvalidOperationException();
+                    // Both objects and integers (reference to the object ID) are allowed
+                    case JTokenType.Object:
+                    case JTokenType.Integer:
+                        return;
+
+                    default:
+                        throw new InvalidOperationException();
                 }
             }
             else
@@ -326,9 +338,84 @@ namespace DataGraph.Controllers.Api
             return newObject;
         }
 
+        [HttpPut("{customerId}/{graphId}/me/{path}")]
+        public void PutForUser(string customerId, int graphId, string path, [FromBody]JToken json)
+        {
+            string userId = "TODO";
 
-        [HttpPut("{customerId}/{graphId}/{entry}/{path}")]
-        public void Put(string customerId, int graphId, string entry, string path, [FromBody]JToken json)
+            if (Request.Headers.TryGetValue("Authorization", out StringValues authValues))
+            {
+                var authVal = authValues.First();
+
+                if (authVal.StartsWith("Bearer "))
+                {
+                    var token = authVal.Substring("Bearer ".Length);
+
+                    var serializer = new JsonNetSerializer();
+                    var provider = new UtcDateTimeProvider();
+                    var validator = new JwtValidator(serializer, provider);
+                    var urlEncoder = new JwtBase64UrlEncoder();
+                    var decoder = new JwtDecoder(serializer, validator, urlEncoder);
+
+                    var tokenJson = decoder.Decode(token);
+
+                    JObject tokenObj = JObject.Parse(tokenJson);
+
+                    // TODO: Need to validate issuer matches the allowed issuer of the DataGraph
+                    // TODO: Need to validate issuer signature
+
+                    userId = tokenObj.Value<string>("sub");
+                }
+                else
+                {
+                    throw new InvalidOperationException("Invalid Authorization format");
+                }
+            }
+            else
+            {
+                throw new InvalidOperationException("Authorization header wasn't provided");
+            }
+
+
+            var graph = _context.DataGraph.First(i => i.CustomerId == customerId && i.Id == graphId);
+
+            var userSchema = graph.Schema.User;
+
+            if (userSchema.TryGetProperty(path, out DataGraphProperty prop))
+            {
+                var userObj = _context.Objects.FirstOrDefault(i =>
+                    i.CustomerId == customerId
+                    && i.GraphId == graphId
+                    && i.UserId == userId
+                    && i.ObjectType == "User");
+
+                if (userObj == null)
+                {
+                    userObj = new DataGraphObject
+                    {
+                        CustomerId = customerId,
+                        GraphId = graphId,
+                        UserId = userId,
+                        ObjectType = "User"
+                    };
+
+                    _context.Objects.Add(userObj);
+
+                    // Save changes so we get an ObjectId assigned
+                    _context.SaveChanges();
+                }
+
+                PutIntoObject(customerId, graphId, userId, userObj.ObjectId, graph.Schema.CustomTypes, prop, json);
+            }
+            else
+            {
+                throw new InvalidOperationException("Unknown property");
+            }
+        }
+
+
+        [HttpPut("{customerId}/{graphId}/global/{path}")]
+        public void PutForGlobal(string customerId, int graphId, string path, [FromBody]JToken json)
         {
             // Ex: api/graphs/{customerId}/{graphId}/global/warningMessage
             // Body: "The new warning message"
@@ -336,144 +423,193 @@ namespace DataGraph.Controllers.Api
             var graph = _context.DataGraph.First(i => i.CustomerId == customerId && i.Id == graphId);
             var bodyToken = json;
 
-            switch (entry.ToLower())
+            var globalSchema = graph.Schema.Global;
+
+            if (globalSchema.TryGetProperty(path, out DataGraphProperty prop))
             {
-                case "global":
+                PutIntoObject(customerId, graphId, "", graph.GlobalObjectId, graph.Schema.CustomTypes, prop, json);
+            }
+            else
+            {
+                throw new KeyNotFoundException("The property wasn't found");
+            }
+        }
+
+        private void PutIntoObject(string customerId, int graphId, string userId, int objectId, IEnumerable<DataGraphClass> customTypes, DataGraphProperty prop, JToken bodyToken)
+        {
+            // Validate that type matches (note that array vs non array doesn't matter, put only allows adding a single item, not an array)
+            AssertTypeMatches(bodyToken, prop);
+
+            if (!prop.IsArray)
+            {
+                if (prop.IsCustomType())
+                {
+                    var customType = customTypes.First(i => i.ClassName == prop.Type);
+
+                    DataGraphReferencePropertyValue literalReference = _context.ReferencePropertyValues.FirstOrDefault(i =>
+                        i.CustomerId == customerId
+                        && i.GraphId == graphId
+                        && i.ObjectId == objectId
+                        && i.PropertyName == prop.Name);
+
+                    if (bodyToken.Type == JTokenType.Integer)
                     {
-                        var globalSchema = graph.Schema.Global;
+                        int objIdToReference = bodyToken.Value<int>();
 
-                        if (globalSchema.TryGetProperty(path, out DataGraphProperty prop))
+                        AssertReferencedObject(customerId, graphId, userId, objIdToReference, customType.ClassName);
+
+                        if (literalReference == null)
                         {
-                            // Validate that type matches (note that array vs non array doesn't matter, put only allows adding a single item, not an array)
-                            AssertTypeMatches(bodyToken, prop);
-
-                            if (!prop.IsArray)
+                            literalReference = new DataGraphReferencePropertyValue
                             {
-                                if (prop.IsCustomType())
-                                {
-                                    DataGraphReferencePropertyValue literalReference = _context.ReferencePropertyValues.FirstOrDefault(i =>
-                                        i.CustomerId == customerId
-                                        && i.GraphId == graphId
-                                        && i.ObjectId == graph.GlobalObjectId
-                                        && i.PropertyName == prop.Name);
+                                CustomerId = customerId,
+                                GraphId = graphId,
+                                ObjectId = objectId,
+                                PropertyName = prop.Name,
+                                ReferencedObjectId = objIdToReference
+                            };
 
-                                    // Nuke the old value
-                                    if (literalReference != null)
-                                    {
-                                        var toDelete = _context.Objects.FirstOrDefault(i =>
-                                            i.CustomerId == customerId
-                                            && i.GraphId == graphId
-                                            && i.ObjectId == literalReference.ObjectId);
+                            _context.ReferencePropertyValues.Add(literalReference);
+                        }
+                        else
+                        {
+                            literalReference.ReferencedObjectId = objIdToReference;
+                        }
+                    }
 
-                                        if (toDelete != null)
-                                        {
-                                            _context.Objects.Remove(toDelete);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        literalReference = new DataGraphReferencePropertyValue
-                                        {
-                                            CustomerId = customerId,
-                                            GraphId = graphId,
-                                            ObjectId = graph.GlobalObjectId,
-                                            PropertyName = prop.Name
-                                        };
+                    else
+                    {
+                        // Nuke the old value
+                        if (literalReference != null)
+                        {
+                            var toDelete = _context.Objects.FirstOrDefault(i =>
+                                i.CustomerId == customerId
+                                && i.GraphId == graphId
+                                && i.ObjectId == literalReference.ObjectId);
 
-                                        _context.ReferencePropertyValues.Add(literalReference);
-                                    }
-
-                                    var customType = graph.Schema.CustomTypes.First(i => i.ClassName == prop.Type);
-
-                                    literalReference.ReferencedObject = AddObject(customerId, graphId, "", customType, json as JObject);
-                                }
-
-                                else
-                                {
-                                    var existing = _context.LiteralPropertyValues.FirstOrDefault(i =>
-                                                        i.CustomerId == customerId
-                                                        && i.GraphId == graphId
-                                                        && i.ObjectId == graph.GlobalObjectId
-                                                        && i.PropertyName == prop.Name);
-                                    if (existing != null)
-                                    {
-                                        // Strings require Formatting.None to output using the "" quotes around the string
-                                        existing.ProperyValueJson = bodyToken.ToString(Newtonsoft.Json.Formatting.None);
-                                    }
-                                    else
-                                    {
-                                        _context.LiteralPropertyValues.Add(new DataGraphLiteralPropertyValue()
-                                        {
-                                            CustomerId = customerId,
-                                            GraphId = graphId,
-                                            ObjectId = graph.GlobalObjectId,
-                                            PropertyName = prop.Name,
-                                            ProperyValueJson = bodyToken.ToString(Newtonsoft.Json.Formatting.None)
-                                        });
-                                    }
-                                }
-
-                                _context.SaveChanges();
-                            }
-                            else
+                            if (toDelete != null)
                             {
-                                // Arrays
-
-                                if (!prop.IsCustomType())
-                                {
-                                    _context.ListOfLiterals.Add(new DataGraphListOfLiteralsPropertyValue
-                                    {
-                                        CustomerId = customerId,
-                                        GraphId = graphId,
-                                        ObjectId = graph.GlobalObjectId,
-                                        PropertyName = prop.Name,
-                                        ListItemValueJson = bodyToken.ToString(Newtonsoft.Json.Formatting.None)
-                                    });
-                                }
-                                else
-                                {
-                                    var customType = graph.Schema.CustomTypes.First(i => i.ClassName == prop.Type);
-
-                                    var dbObj = AddObject(customerId, graphId, "", customType, json as JObject);
-                                    _context.SaveChanges();
-
-                                    _context.ListOfReferences.Add(new DataGraphListOfReferencesPropertyValue
-                                    {
-                                        CustomerId = customerId,
-                                        GraphId = graphId,
-                                        ObjectId = graph.GlobalObjectId,
-                                        PropertyName = prop.Name,
-                                        ReferencedObject = dbObj
-                                    });
-
-                                    //_context.ListOfReferences.Add(new DataGraphListOfReferencesPropertyValue
-                                    //{
-                                    //    CustomerId = customerId,
-                                    //    GraphId = graphId,
-                                    //    ObjectId = graph.GlobalObjectId,
-                                    //    PropertyName = prop.Name,
-                                    //    ReferencedObject = AddObject(customerId, graphId, "", customType, json as JObject)
-                                    //});
-                                }
-
-                                _context.SaveChanges();
+                                _context.Objects.Remove(toDelete);
                             }
                         }
                         else
                         {
-                            throw new KeyNotFoundException("The property wasn't found");
+                            literalReference = new DataGraphReferencePropertyValue
+                            {
+                                CustomerId = customerId,
+                                GraphId = graphId,
+                                ObjectId = objectId,
+                                PropertyName = prop.Name
+                            };
+
+                            _context.ReferencePropertyValues.Add(literalReference);
                         }
-                    }
-                    break;
 
-                case "me":
+                        literalReference.ReferencedObject = AddObject(customerId, graphId, "", customType, bodyToken as JObject);
+                    }
+                }
+
+                else
+                {
+                    var existing = _context.LiteralPropertyValues.FirstOrDefault(i =>
+                                        i.CustomerId == customerId
+                                        && i.GraphId == graphId
+                                        && i.ObjectId == objectId
+                                        && i.PropertyName == prop.Name);
+                    if (existing != null)
                     {
-
+                        // Strings require Formatting.None to output using the "" quotes around the string
+                        existing.ProperyValueJson = bodyToken.ToString(Newtonsoft.Json.Formatting.None);
                     }
-                    break;
+                    else
+                    {
+                        _context.LiteralPropertyValues.Add(new DataGraphLiteralPropertyValue()
+                        {
+                            CustomerId = customerId,
+                            GraphId = graphId,
+                            ObjectId = objectId,
+                            PropertyName = prop.Name,
+                            ProperyValueJson = bodyToken.ToString(Newtonsoft.Json.Formatting.None)
+                        });
+                    }
+                }
 
-                default:
-                    throw new InvalidOperationException("Unknown entry, must either be /global or /me");
+                _context.SaveChanges();
+            }
+            else
+            {
+                // Arrays
+
+                if (!prop.IsCustomType())
+                {
+                    _context.ListOfLiterals.Add(new DataGraphListOfLiteralsPropertyValue
+                    {
+                        CustomerId = customerId,
+                        GraphId = graphId,
+                        ObjectId = objectId,
+                        PropertyName = prop.Name,
+                        ListItemValueJson = bodyToken.ToString(Newtonsoft.Json.Formatting.None)
+                    });
+                }
+                else
+                {
+                    var customType = customTypes.First(i => i.ClassName == prop.Type);
+
+                    if (bodyToken.Type == JTokenType.Integer)
+                    {
+                        int objIdToAdd = bodyToken.Value<int>();
+
+                        // Check object exists and is correct type and user has permission to reference it
+                        AssertReferencedObject(customerId, graphId, userId, objIdToAdd, customType.ClassName);
+
+                        _context.ListOfReferences.Add(new DataGraphListOfReferencesPropertyValue
+                        {
+                            CustomerId = customerId,
+                            GraphId = graphId,
+                            ObjectId = objectId,
+                            PropertyName = prop.Name,
+                            ReferencedObjectId = objIdToAdd
+                        });
+                    }
+
+                    else
+                    {
+                        var dbObj = AddObject(customerId, graphId, "", customType, bodyToken as JObject);
+                        _context.SaveChanges();
+
+                        _context.ListOfReferences.Add(new DataGraphListOfReferencesPropertyValue
+                        {
+                            CustomerId = customerId,
+                            GraphId = graphId,
+                            ObjectId = objectId,
+                            PropertyName = prop.Name,
+                            ReferencedObject = dbObj
+                        });
+                    }
+                }
+
+                _context.SaveChanges();
+            }
+        }
+
+        /// <summary>
+        ///  Asserts that the object exists, is the correct type, and user has permission to reference it
+        /// </summary>
+        /// <param name="customerId"></param>
+        /// <param name="graphId"></param>
+        /// <param name="userId"></param>
+        /// <param name="objectId"></param>
+        /// <param name="objectType"></param>
+        private void AssertReferencedObject(string customerId, int graphId, string userId, int objectId, string objectType)
+        {
+            if (!_context.Objects.Any(i =>
+                i.CustomerId == customerId
+                && i.GraphId == graphId
+                && i.ObjectId == objectId
+                && (i.UserId == "" || i.UserId == userId)
+                && i.ObjectType == objectType))
+            {
+                throw new InvalidOperationException("Referenced object doesn't exist, it's the wrong type, or user doesn't have permission to access it");
             }
         }
 
