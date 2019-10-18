@@ -89,6 +89,44 @@ namespace DataGraph.Controllers.Api
             }
         }
 
+        [HttpDelete("{customerId}/{graphId}/global/{propArray}/{itemId}")]
+        public void DeleteGlobalArrayItem(string customerId, int graphId, string propArray, int itemId)
+        {
+            var graph = _context.DataGraph.First(i => i.CustomerId == customerId && i.Id == graphId);
+
+            if (graph.Schema.Global.TryGetProperty(propArray, out DataGraphProperty prop))
+            {
+                if (prop.IsArray)
+                {
+                    // Check it's actually in that specified collection
+                    var reference = _context.ListOfReferences.FirstOrDefault(i =>
+                        i.CustomerId == customerId
+                        && i.GraphId == graphId
+                        && i.ObjectId == graph.GlobalObjectId
+                        && i.PropertyName == prop.Name
+                        && i.ReferencedObjectId == itemId);
+
+                    if (reference != null)
+                    {
+                        _context.ListOfReferences.Remove(reference);
+                        _context.SaveChanges();
+                    }
+                    else
+                    {
+                        throw new KeyNotFoundException();
+                    }
+                }
+                else
+                {
+                    throw new InvalidOperationException();
+                }
+            }
+            else
+            {
+                throw new InvalidOperationException();
+            }
+        }
+
         private JObject GetObjectJson(string customerId, int graphId, int objectId)
         {
             JObject answer = new JObject();
