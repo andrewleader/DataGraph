@@ -1,0 +1,26 @@
+﻿
+<li class="nav-item px-3">
+    <NavLink class="nav-link" href="@PropertiesHref">
+        <span class="oi oi-home" aria-hidden="true"></span> Properties
+    </NavLink>
+</li>
+<li class="nav-item px-3">
+    <NavLink class="nav-link" href="@ApiHref">
+        <span class="oi oi-plus" aria-hidden="true"></span> API definitions
+    </NavLink>
+</li>
+<li class="nav-item px-3">
+    <NavLink class="nav-link" href="@SchemaHref">
+        <span class="oi oi-list-rich" aria-hidden="true"></span> Schema
+    </NavLink>
+</li>
+
+@code {
+    [CascadingParameter(Name = "RouteParameters")] IDictionary<string, object> parameters { get; set; }
+
+    private int GraphId => (int)parameters["graphId"];
+
+    private string PropertiesHref => $"graphs/{GraphId}";
+    private string ApiHref => $"graphs/{GraphId}/api";
+    private string SchemaHref => $"graphs/{GraphId}/schema";
+}

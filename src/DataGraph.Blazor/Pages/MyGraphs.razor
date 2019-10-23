@@ -1,0 +1,44 @@
+﻿@page "/"
+
+@using DataGraph.Blazor.Data
+@using DataGraph.Models;
+@inject DataGraphService GraphService
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<h1>My graphs</h1>
+
+@if (graphs == null)
+{
+    <p><em>Loading... Log in if you're not already logged in!</em></p>
+}
+else
+{
+    if (graphs.Length == 0)
+    {
+        <p>No graphs! Create a new one!</p>
+    }
+    else
+    {
+        <ul>
+            @foreach (var g in graphs)
+            {
+                <li><a href="/graphs/@g.Id">@g.Name</a></li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    DataGraphInstance[] graphs;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+        if (authState.User.Identity.IsAuthenticated)
+        {
+            graphs = GraphService.GetGraphsForCustomer(authState);
+        }
+    }
+}

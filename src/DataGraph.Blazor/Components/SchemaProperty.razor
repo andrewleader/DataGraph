@@ -1,0 +1,13 @@
+﻿@using DataGraph.Blazor.Data
+@using DataGraph.Models;
+@inject DataGraphService GraphService
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject Microsoft.AspNetCore.Components.NavigationManager NavManager
+
+<p>@Property.ToString()</p>
+
+@code {
+    [Parameter]
+    public DataGraphProperty Property { get; set; }
+}

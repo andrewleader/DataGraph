@@ -1,0 +1,41 @@
+﻿@page "/new"
+
+@using DataGraph.Blazor.Data
+@using DataGraph.Models;
+@inject DataGraphService GraphService
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject Microsoft.AspNetCore.Components.NavigationManager NavManager
+
+<h1>Create a DataGraph</h1>
+
+@if (_submitting)
+{
+    <p>Creating your graph...</p>
+}
+else
+{
+    <EditForm Model="@model" OnValidSubmit="@Submit">
+        <InputText id="name" @bind-Value="@model.Name" />
+
+        <button type="submit">Create</button>
+    </EditForm>
+}
+
+@code {
+    private DataGraphInstance model = new DataGraphInstance();
+
+    private bool _submitting;
+
+    private async void Submit()
+    {
+        _submitting = true;
+
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+        int newGraphId = GraphService.CreateGraphForCustomer(authState, model.Name);
+
+        NavManager.NavigateTo("/graphs/" + newGraphId);
+    }
+}

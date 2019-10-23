@@ -1,0 +1,85 @@
+﻿@using DataGraph.Blazor.Data
+@using DataGraph.Models;
+@inject DataGraphService GraphService
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject Microsoft.AspNetCore.Components.NavigationManager NavManager
+
+@foreach (var prop in Class.Properties)
+{
+    <SchemaProperty Property="@prop" />
+}
+
+@if (isAdding)
+{
+    <strong>New property...</strong>
+    <EditForm Model="@newProperty" OnValidSubmit="@SaveNewProperty">
+        <div class="form-group">
+            <label for="name">Name</label>
+            <InputText id="name" @bind-Value="@newProperty.Name" />
+        </div>
+        <div class="form-group">
+            <label for="type">Type</label>
+            <InputSelect id="type" @bind-Value="@newProperty.Type">
+                <option value="string">string</option>
+                <option value="int">int</option>
+                <option value="decimal">decimal</option>
+                @foreach (var type in Graph.Schema.CustomTypes)
+                    {
+                    <option value="@type.ClassName">@type.ClassName</option>
+                    }
+                /**/
+            </InputSelect>
+        </div>
+        <div class="form-group">
+            <label class="control-label">Is array?</label>
+            <InputCheckbox @bind-Value="@newProperty.IsArray"/>
+        </div>
+        <button type="submit">Save property</button>
+    </EditForm>
+}
+else
+{
+    <button @onclick="AddProperty">Add property</button>
+}
+
+@code {
+    [Parameter]
+    public DataGraphInstance Graph { get; set; }
+
+    [Parameter]
+    public DataGraphClass Class { get; set; }
+
+    private bool isAdding = false;
+
+    private DataGraphProperty newProperty { get; set; } = null;
+
+    void AddProperty()
+    {
+        newProperty = new DataGraphProperty()
+        {
+            Type = "string"
+        };
+
+        isAdding = true;
+    }
+
+    async Task SaveNewProperty()
+    {
+        Class.Properties.Add(newProperty);
+
+        try
+        {
+            Graph.ApplySchemaChanges();
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+            GraphService.UpdateSchema(authState, Graph.Id, Graph.Schema);
+            isAdding = false;
+        }
+        catch
+        {
+            Class.Properties.Remove(newProperty);
+            return;
+        }
+    }
+}

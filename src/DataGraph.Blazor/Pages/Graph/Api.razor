@@ -1,0 +1,71 @@
+﻿@*@layout GraphLayout*@
+@page "/graphs/{GraphId:int}/api"
+
+@using DataGraph.Blazor.Data
+@using DataGraph.Models;
+@using DataGraph.Helpers;
+@inject DataGraphService GraphService
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject Microsoft.AspNetCore.Components.NavigationManager NavManager
+
+<h1>API</h1>
+
+@if (loading)
+{
+    <p>Loading...</p>
+}
+else
+{
+    @if (graph == null)
+    {
+        <p>Graph not found.</p>
+    }
+    else
+    {
+        <h2>Endpoint</h2>
+
+        <pre>@endpointUrl</pre>
+
+        <h2>APIs</h2>
+
+        @foreach (var def in ApiDefinitionHelper.GetApiDefinitions(graph.Schema))
+        {
+            <div class="api-definition">
+                <pre class="api-path">@def.Method.ToString().ToUpper() @def.RelativePath</pre>
+
+                <strong>Response</strong>
+                <pre class="api-response">@def.ReturnFormat</pre>
+            </div>
+        }
+    }
+}
+
+
+
+@code {
+    [Parameter]
+    public int GraphId { get; set; }
+
+    private DataGraphInstance graph;
+
+    private bool loading = true;
+
+    private string endpointUrl;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+        graph = GraphService.GetGraphForCustomer(authState, GraphId);
+
+        loading = false;
+
+        endpointUrl = $"{NavManager.BaseUri}api/graphs/{authState.User.GetCustomerId()}/{graph.Id}";
+    }
+
+    private void Update()
+    {
+
+    }
+}

@@ -1,0 +1,59 @@
+﻿@*@layout GraphLayout*@
+@page "/graphs/{GraphId:int}"
+
+@using DataGraph.Blazor.Data
+@using DataGraph.Models;
+@inject DataGraphService GraphService
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<h1>Properties</h1>
+
+@if (loading)
+{
+    <p>Loading...</p>
+}
+else
+{
+    @if (graph == null)
+    {
+        <p>Graph not found.</p>
+    }
+    else
+    {
+        <EditForm Model="@graph" OnValidSubmit="@Update">
+            <div class="form-group">
+                <label for="name">Name</label>
+                <InputText id="name" @bind-Value="@graph.Name" />
+            </div>
+
+            <div class="form-group">
+                <button type="submit">Update</button>
+            </div>
+        </EditForm>
+    }
+}
+
+
+
+@code {
+    [Parameter]
+    public int GraphId { get; set; }
+
+    private DataGraphInstance graph;
+    private bool loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+        graph = GraphService.GetGraphForCustomer(authState, GraphId);
+
+        loading = false;
+    }
+
+    private void Update()
+    {
+
+    }
+}

@@ -1,0 +1,107 @@
+﻿@*@layout GraphLayout*@
+@page "/graphs/{GraphId:int}/schema"
+
+@using DataGraph.Blazor.Data
+@using DataGraph.Models;
+@inject DataGraphService GraphService
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<h1>Schema</h1>
+
+@if (loading)
+{
+    <p>Loading...</p>
+}
+else
+{
+    @if (graph == null)
+    {
+        <p>Graph not found.</p>
+    }
+    else
+    {
+        <h2>Global values</h2>
+        <DataGraph.Blazor.Components.SchemaClass Class="graph.Schema.Global" Graph="graph" />
+
+        <h2>User values</h2>
+        <DataGraph.Blazor.Components.SchemaClass Class="graph.Schema.User" Graph="graph" />
+
+        <h2>Custom types</h2>
+
+        @foreach (var type in graph.Schema.CustomTypes)
+        {
+            <h3>@type.ClassName</h3>
+            <DataGraph.Blazor.Components.SchemaClass Class="type" Graph="graph" />
+        }
+
+        @if (addingNewType)
+        {
+            <strong>New type...</strong>
+            <EditForm Model="@newType" OnValidSubmit="@SaveNewType">
+                <div class="form-group">
+                    <label for="name">Name</label>
+                    <InputText id="name" @bind-Value="@newType.ClassName" />
+                </div>
+                <button type="submit">Save type</button>
+            </EditForm>
+        }
+        else
+        {
+            <button @onclick="AddNewType">Add new type</button>
+        }
+    }
+}
+
+
+
+@code {
+    [Parameter]
+    public int GraphId { get; set; }
+
+    private DataGraphInstance graph;
+    private bool loading = true;
+
+    private bool addingNewType = false;
+
+    private DataGraphClass newType { get; set; }
+
+    void AddNewType()
+    {
+        newType = new DataGraphClass();
+        addingNewType = true;
+    }
+
+    async Task SaveNewType()
+    {
+        graph.Schema.CustomTypes.Add(newType);
+
+        try
+        {
+            graph.ApplySchemaChanges();
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+            GraphService.UpdateSchema(authState, GraphId, graph.Schema);
+            addingNewType = false;
+        }
+        catch
+        {
+            graph.Schema.CustomTypes.Remove(newType);
+            return;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+        graph = GraphService.GetGraphForCustomer(authState, GraphId);
+
+        loading = false;
+    }
+
+    private void Update()
+    {
+
+    }
+}
