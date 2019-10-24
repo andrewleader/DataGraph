@@ -10,7 +10,7 @@ namespace DataGraph.Helpers
     {
         public static string GetCustomerId(this ClaimsPrincipal user)
         {
-            return user.Claims.First().Value;
+            return user.FindFirstValue(ClaimTypes.NameIdentifier);
         }
     }
 }
